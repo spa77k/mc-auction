@@ -1,0 +1,6 @@
+server-data/
+server-data-26.1.2/
+server-data-26.2/
+target/
+dependency-reduced-pom.xml
+.env
