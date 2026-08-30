@@ -1,0 +1,20 @@
+name: AuctionHouse
+version: '${project.version}'
+main: net.mcauction.auctionhouse.AuctionHousePlugin
+api-version: "1.21"
+author: mc-auction
+depend: [Vault]
+
+commands:
+  ah:
+    description: オークションハウスを開く
+    usage: /ah [sell|list|my|bids|vault|cancel|admin]
+    aliases: [auction]
+
+permissions:
+  auction.use:
+    description: オークションハウスの利用(出品・入札・保管庫の利用)
+    default: true
+  auction.admin:
+    description: 不正出品の強制終了と返却
+    default: op

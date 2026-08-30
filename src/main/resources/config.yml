@@ -1,0 +1,144 @@
+# AuctionHouse 設定ファイル
+
+auction:
+  # 開始価格の下限・上限
+  min-price: 10
+  max-price: 100000
+  # 1人が同時に出品できる件数
+  max-listings-per-player: 3
+  # 出品期間として選べる時間(このリストの数値のみ受け付ける)
+  durations-hours: [6, 12, 24, 48]
+  # 出品料 = ceil(開始価格 * listing-fee-rate)、ただし listing-fee-min を下回らない。
+  # 出品確定時に徴収し、売れ残り・取り消し・落札のいずれでも返還しない。
+  listing-fee-rate: 0.05
+  listing-fee-min: 10
+  # 成約手数料 = ceil(落札額 * sale-fee-rate)。落札額から差し引いて出品者へ入金する。
+  sale-fee-rate: 0.10
+  # 最低入札上げ幅 = max(ceil(現在価格 * min-increment-rate), min-increment-flat)
+  min-increment-rate: 0.05
+  min-increment-flat: 10
+  # 終了までこの秒数以内の入札があった場合、終了時刻を extension-seconds 後へ延長する
+  extension-threshold-seconds: 180
+  extension-seconds: 180
+  # 自動延長の最大回数
+  max-extensions: 10
+  # 出品・入札のチャット入力を何秒放置したら自動キャンセルするか
+  input-timeout-seconds: 120
+  # 終了済み出品(SOLD/EXPIRED/CANCELLED)の履歴レコードを何日後にデータベースから削除するか。0以下で無効化。
+  # 保管庫(vault_items)は対象外で無期限保持する。
+  retention-days: 30
+  # 出品を禁止するマテリアル名のリスト(空なら制限なし)
+  banned-materials: []
+
+# 終了処理・延長チェックの実行間隔(秒)
+check-interval-seconds: 5
+
+messages:
+  prefix: "&6[オークション] &r"
+  no-permission: "&cこの操作を行う権限がありません。"
+  player-only: "&cこのコマンドはプレイヤーのみ実行できます。"
+  unknown-subcommand: "&c不明なサブコマンドです。/ah [sell|list|my|bids|vault|cancel]"
+  economy-not-found: "&c経済プラグイン(Vault)が見つかりません。管理者に連絡してください。"
+
+  error:
+    generic: "&c処理に失敗しました。時間をおいて再度お試しください。"
+
+  gui:
+    main-title: "オークションハウス"
+    list-title: "出品一覧"
+    detail-title: "出品の詳細"
+    my-listings-title: "自分の出品"
+    my-bids-title: "入札中"
+    vault-title: "保管庫"
+    buyout-confirm-title: "即決購入の確認"
+
+  main-menu:
+    browse: "&a出品を探す"
+    browse-lore: "&7出品中のアイテムを見る"
+    sell: "&a出品する"
+    sell-lore: "&7手に持っているアイテムを出品する"
+    my-listings: "&a自分の出品"
+    my-listings-lore: "&7自分が出品したアイテムを見る"
+    my-bids: "&a入札中"
+    my-bids-lore: "&7自分が入札した出品を見る"
+    vault: "&a保管庫"
+    vault-lore: "&7受け取り待ちのアイテムを見る"
+
+  list:
+    empty: "&e現在出品中のアイテムはありません。"
+    sort-label: "&a並び替え: {mode}"
+    sort-ending-soon: "終了間近"
+    sort-newest: "新着"
+    sort-price-low: "価格が安い順"
+    sort-price-high: "価格が高い順"
+
+  sell:
+    empty-hand: "&c手に何も持っていません。出品したいアイテムを持ってから実行してください。"
+    banned-material: "&cこのアイテムは出品できません。"
+    limit-reached: "&c同時に出品できるのは{max}件までです。"
+    start: "&a出品手続きを開始します。次の入力は全体チャットやDiscordには流れません。(キャンセルは /ah cancel)"
+    ask-amount: "&a出品する個数を入力してください。(1〜{max}、そのままEnterで全部)"
+    invalid-amount: "&c個数は1〜{max}の整数で入力してください。"
+    ask-start-price: "&a開始価格を入力してください。({min}〜{max})"
+    invalid-start-price: "&c開始価格は{min}〜{max}の整数で入力してください。"
+    ask-buyout-price: "&a即決価格を入力してください。(開始価格より大きい整数。不要なら0か「なし」を入力、そのままEnterでも不要扱いになります)"
+    invalid-buyout-price: "&c即決価格は開始価格({min})より大きい整数で入力してください。不要な場合は0か「なし」を入力してください。"
+    ask-duration: "&a出品期間を選んでください。({options}時間から数値で入力)"
+    invalid-duration: "&c出品期間は{options}時間のいずれかで入力してください。"
+    ask-confirm: "&a出品料{fee}を徴収して出品します。よろしいですか？(はい/いいえ)"
+    invalid-confirm: "&c「はい」または「いいえ」で答えてください。"
+    cancelled-confirm: "&e出品をキャンセルしました。"
+    insufficient-funds: "&c出品料{fee}分の所持金が足りないため出品できませんでした。"
+    item-changed: "&c手持ちのアイテムが出品開始時から変わっているため出品できませんでした。"
+    completed: "&a「{item}」を{amount}個、開始価格{price}で出品しました。(出品料{fee}を徴収)"
+    cancelled-input: "&e出品手続きをキャンセルしました。"
+    no-active-session: "&e進行中の出品手続きはありません。"
+    input-timeout: "&e一定時間入力がなかったため、出品手続きをキャンセルしました。"
+    announce: "&e{player}が「{item}」を出品しました。(開始価格{price})"
+
+  bid:
+    own-listing: "&c自分の出品には入札できません。"
+    not-active: "&cこの出品は既に終了しています。"
+    start: "&a入札額を入力してください。(最低{min}、キャンセルは /ah cancel)"
+    invalid-amount: "&c入札額は{min}以上の整数で入力してください。"
+    insufficient-funds: "&c所持金が足りません。({amount}必要です)"
+    success: "&a「{item}」に{price}で入札しました。"
+    cancelled-input: "&e入札をキャンセルしました。"
+    no-active-session: "&e進行中の入札はありません。"
+    input-timeout: "&e一定時間入力がなかったため、入札をキャンセルしました。"
+    extended: "&e「{item}」への入札により終了時刻が延長されました。"
+
+  buyout:
+    not-available: "&cこの出品には即決価格が設定されていません。"
+    ask: "&a即決価格{price}で「{item}」を購入します。よろしいですか？"
+    success: "&a「{item}」を{price}で即決購入しました。"
+    insufficient-funds: "&c所持金が足りないため購入できません。"
+
+  cancel-listing:
+    success: "&e出品「{item}」を取り消しました。(出品料は返還されません)"
+    has-bids: "&c入札が入っているため取り消せません。"
+    not-owner: "&c自分の出品のみ取り消せます。"
+    not-active: "&cこの出品はすでに終了しています。"
+
+  vault:
+    empty: "&e保管庫にアイテムはありません。"
+    received: "&a「{item}」を受け取りました。"
+    full: "&cインベントリに空きがないため、一部またはすべてのアイテムを保管庫に残しました。"
+
+  notify:
+    outbid: "&c「{item}」への入札があなたを上回りました。(新しい価格: {price})入札額は返金されました。"
+    won: "&a「{item}」を{price}で落札しました。保管庫から受け取ってください。"
+    sold: "&a「{item}」が{price}で落札されました。手数料{fee}を差し引いた{amount}が振り込まれました。"
+    unsold: "&e「{item}」は入札がなく売れ残りました。保管庫から受け取ってください。"
+    listing-cancelled-by-admin: "&c出品「{item}」が管理者により強制的に取り消されました。アイテムは保管庫から受け取れます。"
+    bid-refunded-by-admin: "&c出品「{item}」が管理者により取り消されたため、入札額{amount}を返金しました。"
+
+  announce:
+    listed: "&e{player}が「{item}」を出品しました。(開始価格{price})"
+    sold: "&e「{item}」が{buyer}に{price}で落札されました。"
+
+  admin:
+    usage: "&c使い方: /ah admin cancel <出品ID>"
+    not-found: "&c指定された出品IDが見つかりません。"
+    not-active: "&cこの出品はすでに終了しています。"
+    cancelled: "&a出品ID {id} 「{item}」を強制的に取り消しました。"
