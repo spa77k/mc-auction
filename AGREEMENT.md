@@ -50,5 +50,5 @@ Paper 26.1.2 向けのオークションプラグイン。プレイヤー同士�
 - カテゴリによる絞り込み(並び替えのみ)
 - 評価・星機能(`/irai` 側の仕組みで、オークションには持ち込まない)
 - QuickShop-Hikari との連携・置き換え
-- Discord への出品通知連携
+- Discord への出品通知連携。本プラグイン自身はDiscordへ送信しない。出品成立時に `AuctionListedEvent` を発火するのみで、実際の通知は購読側の外部プラグイン(EcoLifeAssist等)の役目とする
 - サーバー本番反映。ビルドとローカル Paper 26.1.2 での起動確認まで。GitHubリリースと spsmc-infra の Dockerfile への SHA-256 固定は動作確認後に別途行う。

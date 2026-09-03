@@ -1,6 +1,7 @@
 package net.mcauction.auctionhouse;
 
 import net.mcauction.auctionhouse.economy.EconomyService;
+import net.mcauction.auctionhouse.event.AuctionListedEvent;
 import net.mcauction.auctionhouse.model.Listing;
 import net.mcauction.auctionhouse.model.ListingSort;
 import net.mcauction.auctionhouse.model.ListingStatus;
@@ -258,6 +259,12 @@ public class AuctionService {
         announcePlaceholders.put("item", displayName);
         announcePlaceholders.put("price", economyService.format(session.getStartPrice()));
         Bukkit.broadcastMessage(messages.formatted("announce.listed", announcePlaceholders));
+
+        // 外部プラグイン向けの出品成立通知イベント。ここまで来た時点で保存・徴収・回収は完了している
+        Bukkit.getPluginManager().callEvent(new AuctionListedEvent(listing.getId(), player.getUniqueId(),
+                player.getName(), displayName, session.getAmount(), session.getStartPrice(), session.getBuyoutPrice(),
+                session.getDurationHours(), economyService.format(session.getStartPrice()),
+                economyService.format(session.getBuyoutPrice())));
 
         logger.fine("出品ID " + listing.getId() + " を作成しました。");
         return SellConfirmResult.OK;
