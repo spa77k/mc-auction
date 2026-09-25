@@ -49,7 +49,11 @@ public class AhCommand implements CommandExecutor, TabCompleter {
         }
 
         switch (args[0].toLowerCase(Locale.ROOT)) {
-            case "sell" -> sellConversation.start(player);
+            case "sell" -> {
+                if (AuctionService.isEcoLifePhone(player.getInventory().getItemInMainHand()))
+                    guiManager.openSellItemPicker(player);
+                else sellConversation.start(player);
+            }
             case "list", "browse" -> guiManager.openListingList(player, 0, ListingSort.ENDING_SOON);
             case "my" -> guiManager.openMyListings(player);
             case "bids" -> guiManager.openMyBids(player);
