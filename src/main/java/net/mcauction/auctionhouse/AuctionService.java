@@ -16,11 +16,13 @@ import net.mcauction.auctionhouse.util.ItemSerialization;
 import net.mcauction.auctionhouse.util.MessageUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataType;
 
 import java.sql.SQLException;
 import java.util.HashMap;
@@ -40,6 +42,8 @@ import java.util.logging.Logger;
  * メインスレッド上でのみ実行されるため、常にメインスレッドから呼ばれる。
  */
 public class AuctionService {
+
+    private static final NamespacedKey ECOLIFE_PHONE_KEY = new NamespacedKey("ecolifeassist", "phone");
 
     public enum SellStartResult {
         OK, EMPTY_HAND, BANNED_MATERIAL, LIMIT_REACHED
@@ -191,7 +195,7 @@ public class AuctionService {
             return SellStartResult.EMPTY_HAND;
         }
         List<String> banned = config.getStringList("auction.banned-materials");
-        if (banned.contains(hand.getType().name())) {
+        if (banned.contains(hand.getType().name()) || isEcoLifePhone(hand)) {
             return SellStartResult.BANNED_MATERIAL;
         }
         int max = config.getInt("auction.max-listings-per-player", 3);
@@ -208,6 +212,9 @@ public class AuctionService {
 
     public SellConfirmResult confirmSell(Player player, SellSession session) {
         ItemStack hand = player.getInventory().getItemInMainHand();
+        if (isEcoLifePhone(hand) || isEcoLifePhone(session.getSnapshotItem())) {
+            return SellConfirmResult.ITEM_CHANGED;
+        }
         if (!hand.isSimilar(session.getSnapshotItem()) || hand.getAmount() < session.getAmount()) {
             return SellConfirmResult.ITEM_CHANGED;
         }
@@ -268,6 +275,11 @@ public class AuctionService {
 
         logger.fine("出品ID " + listing.getId() + " を作成しました。");
         return SellConfirmResult.OK;
+    }
+
+    private static boolean isEcoLifePhone(ItemStack item) {
+        return item != null && item.hasItemMeta()
+                && item.getItemMeta().getPersistentDataContainer().has(ECOLIFE_PHONE_KEY, PersistentDataType.BYTE);
     }
 
     // ---------------------------------------------------------------
