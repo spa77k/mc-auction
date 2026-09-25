@@ -40,7 +40,11 @@ public class SellConversation {
     }
 
     public void start(Player player) {
-        AuctionService.SellStartResult result = auctionService.canStartSell(player);
+        start(player, -1);
+    }
+
+    public void start(Player player, int inventorySlot) {
+        AuctionService.SellStartResult result = auctionService.canStartSell(player, inventorySlot);
         switch (result) {
             case EMPTY_HAND -> {
                 messages.send(player, "sell.empty-hand");
@@ -60,11 +64,12 @@ public class SellConversation {
             }
         }
 
-        ItemStack hand = player.getInventory().getItemInMainHand();
-        ItemStack snapshot = hand.clone();
-        int maxAmount = hand.getAmount();
+        ItemStack item = inventorySlot == -1 ? player.getInventory().getItemInMainHand()
+                : player.getInventory().getItem(inventorySlot);
+        ItemStack snapshot = item.clone();
+        int maxAmount = item.getAmount();
 
-        sessionManager.startSell(player.getUniqueId(), new SellSession(snapshot, maxAmount));
+        sessionManager.startSell(player.getUniqueId(), new SellSession(snapshot, maxAmount, inventorySlot));
         player.closeInventory();
         messages.send(player, "sell.start");
         Conversation conversation = factory.buildConversation(player);

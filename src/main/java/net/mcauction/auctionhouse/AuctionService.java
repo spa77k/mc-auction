@@ -190,12 +190,17 @@ public class AuctionService {
     // ---------------------------------------------------------------
 
     public SellStartResult canStartSell(Player player) {
-        ItemStack hand = player.getInventory().getItemInMainHand();
-        if (hand.getType().isAir()) {
+        return canStartSell(player, -1);
+    }
+
+    public SellStartResult canStartSell(Player player, int inventorySlot) {
+        if (inventorySlot < -1 || inventorySlot >= 36) return SellStartResult.EMPTY_HAND;
+        ItemStack item = inventorySlot == -1 ? player.getInventory().getItemInMainHand()
+                : player.getInventory().getItem(inventorySlot);
+        if (item == null || item.getType().isAir()) {
             return SellStartResult.EMPTY_HAND;
         }
-        List<String> banned = config.getStringList("auction.banned-materials");
-        if (banned.contains(hand.getType().name()) || isEcoLifePhone(hand)) {
+        if (!isSellableItem(item)) {
             return SellStartResult.BANNED_MATERIAL;
         }
         int max = config.getInt("auction.max-listings-per-player", 3);
@@ -211,11 +216,14 @@ public class AuctionService {
     }
 
     public SellConfirmResult confirmSell(Player player, SellSession session) {
-        ItemStack hand = player.getInventory().getItemInMainHand();
-        if (isEcoLifePhone(hand) || isEcoLifePhone(session.getSnapshotItem())) {
+        int inventorySlot = session.getInventorySlot();
+        if (inventorySlot < -1 || inventorySlot >= 36) return SellConfirmResult.ITEM_CHANGED;
+        ItemStack item = inventorySlot == -1 ? player.getInventory().getItemInMainHand()
+                : player.getInventory().getItem(inventorySlot);
+        if (item == null || !isSellableItem(item) || !isSellableItem(session.getSnapshotItem())) {
             return SellConfirmResult.ITEM_CHANGED;
         }
-        if (!hand.isSimilar(session.getSnapshotItem()) || hand.getAmount() < session.getAmount()) {
+        if (!item.isSimilar(session.getSnapshotItem()) || item.getAmount() < session.getAmount()) {
             return SellConfirmResult.ITEM_CHANGED;
         }
 
@@ -246,12 +254,14 @@ public class AuctionService {
             return SellConfirmResult.FAILED;
         }
 
-        if (hand.getAmount() == session.getAmount()) {
-            player.getInventory().setItemInMainHand(new ItemStack(Material.AIR));
+        if (item.getAmount() == session.getAmount()) {
+            if (inventorySlot == -1) player.getInventory().setItemInMainHand(new ItemStack(Material.AIR));
+            else player.getInventory().setItem(inventorySlot, new ItemStack(Material.AIR));
         } else {
-            ItemStack remaining = hand.clone();
-            remaining.setAmount(hand.getAmount() - session.getAmount());
-            player.getInventory().setItemInMainHand(remaining);
+            ItemStack remaining = item.clone();
+            remaining.setAmount(item.getAmount() - session.getAmount());
+            if (inventorySlot == -1) player.getInventory().setItemInMainHand(remaining);
+            else player.getInventory().setItem(inventorySlot, remaining);
         }
 
         Map<String, String> placeholders = new HashMap<>();
@@ -277,7 +287,12 @@ public class AuctionService {
         return SellConfirmResult.OK;
     }
 
-    private static boolean isEcoLifePhone(ItemStack item) {
+    public boolean isSellableItem(ItemStack item) {
+        return item != null && !item.getType().isAir() && !isEcoLifePhone(item)
+                && !config.getStringList("auction.banned-materials").contains(item.getType().name());
+    }
+
+    public static boolean isEcoLifePhone(ItemStack item) {
         return item != null && item.hasItemMeta()
                 && item.getItemMeta().getPersistentDataContainer().has(ECOLIFE_PHONE_KEY, PersistentDataType.BYTE);
     }

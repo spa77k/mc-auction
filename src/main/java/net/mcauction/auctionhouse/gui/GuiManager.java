@@ -67,6 +67,24 @@ public class GuiManager {
         player.openInventory(inventory);
     }
 
+    public void openSellItemPicker(Player player) {
+        SellItemHolder holder = new SellItemHolder();
+        Inventory inventory = Bukkit.createInventory(holder, 45, messages.get("gui.sell-item-title"));
+        holder.setInventory(inventory);
+        boolean hasItem = false;
+        for (int slot = 0; slot < 36; slot++) {
+            ItemStack item = player.getInventory().getItem(slot);
+            if (!auctionService.isSellableItem(item)) continue;
+            inventory.setItem(slot, item.clone());
+            hasItem = true;
+        }
+        if (!hasItem) inventory.setItem(22, new ItemBuilder(Material.BARRIER)
+                .name("§e出品できるアイテムがありません").build());
+        inventory.setItem(SellItemHolder.SLOT_BACK, new ItemBuilder(Material.ARROW)
+                .name("§aオークションに戻る").build());
+        player.openInventory(inventory);
+    }
+
     public void openListingList(Player player, int page, ListingSort sort) {
         List<Listing> active = auctionService.findActiveListings(sort);
         int totalPages = Math.max(1, (int) Math.ceil(active.size() / (double) PAGE_SIZE));

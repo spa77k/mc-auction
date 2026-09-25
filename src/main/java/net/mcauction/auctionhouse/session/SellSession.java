@@ -15,14 +15,20 @@ public class SellSession {
     private Step step = Step.AMOUNT;
     private final ItemStack snapshotItem;
     private final int maxAmount;
+    private final int inventorySlot;
     private int amount;
     private int startPrice;
     private int buyoutPrice;
     private int durationHours;
 
     public SellSession(ItemStack snapshotItem, int maxAmount) {
+        this(snapshotItem, maxAmount, -1);
+    }
+
+    public SellSession(ItemStack snapshotItem, int maxAmount, int inventorySlot) {
         this.snapshotItem = snapshotItem;
         this.maxAmount = maxAmount;
+        this.inventorySlot = inventorySlot;
     }
 
     public Step getStep() {
@@ -39,6 +45,10 @@ public class SellSession {
 
     public int getMaxAmount() {
         return maxAmount;
+    }
+
+    public int getInventorySlot() {
+        return inventorySlot;
     }
 
     public int getAmount() {

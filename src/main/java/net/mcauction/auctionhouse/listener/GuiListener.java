@@ -8,6 +8,7 @@ import net.mcauction.auctionhouse.gui.ListingListHolder;
 import net.mcauction.auctionhouse.gui.MainMenuHolder;
 import net.mcauction.auctionhouse.gui.MyBidsHolder;
 import net.mcauction.auctionhouse.gui.MyListingsHolder;
+import net.mcauction.auctionhouse.gui.SellItemHolder;
 import net.mcauction.auctionhouse.gui.VaultHolder;
 import net.mcauction.auctionhouse.model.ListingSort;
 import net.mcauction.auctionhouse.session.BidConversation;
@@ -18,7 +19,9 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.InventoryHolder;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
 public class GuiListener implements Listener {
@@ -44,6 +47,7 @@ public class GuiListener implements Listener {
     public void onClick(InventoryClickEvent event) {
         InventoryHolder holder = event.getInventory().getHolder();
         if (!(holder instanceof MainMenuHolder) && !(holder instanceof ListingListHolder)
+                && !(holder instanceof SellItemHolder)
                 && !(holder instanceof ListingDetailHolder) && !(holder instanceof BuyoutConfirmHolder)
                 && !(holder instanceof MyListingsHolder) && !(holder instanceof MyBidsHolder)
                 && !(holder instanceof VaultHolder)) {
@@ -61,6 +65,8 @@ public class GuiListener implements Listener {
 
         if (holder instanceof MainMenuHolder) {
             handleMainMenu(player, slot);
+        } else if (holder instanceof SellItemHolder) {
+            handleSellItemPicker(player, slot);
         } else if (holder instanceof ListingListHolder listHolder) {
             handleListingList(player, listHolder, slot);
         } else if (holder instanceof ListingDetailHolder detailHolder) {
@@ -76,12 +82,22 @@ public class GuiListener implements Listener {
         }
     }
 
+    @EventHandler
+    public void onDrag(InventoryDragEvent event) {
+        if (event.getView().getTopInventory().getHolder() instanceof SellItemHolder)
+            event.setCancelled(true);
+    }
+
     private void handleMainMenu(Player player, int slot) {
         if (slot == MainMenuHolder.SLOT_BROWSE) {
             guiManager.openListingList(player, 0, ListingSort.ENDING_SOON);
         } else if (slot == MainMenuHolder.SLOT_SELL) {
-            player.closeInventory();
-            Bukkit.getScheduler().runTask(plugin, () -> sellConversation.start(player));
+            if (AuctionService.isEcoLifePhone(player.getInventory().getItemInMainHand())) {
+                guiManager.openSellItemPicker(player);
+            } else {
+                player.closeInventory();
+                Bukkit.getScheduler().runTask(plugin, () -> sellConversation.start(player));
+            }
         } else if (slot == MainMenuHolder.SLOT_MY_LISTINGS) {
             guiManager.openMyListings(player);
         } else if (slot == MainMenuHolder.SLOT_MY_BIDS) {
@@ -89,6 +105,24 @@ public class GuiListener implements Listener {
         } else if (slot == MainMenuHolder.SLOT_VAULT) {
             guiManager.openVault(player, 0);
         }
+    }
+
+    private void handleSellItemPicker(Player player, int slot) {
+        if (slot == SellItemHolder.SLOT_BACK) {
+            guiManager.openMainMenu(player);
+            return;
+        }
+        if (slot < 0 || slot >= 36 || !auctionService.isSellableItem(player.getInventory().getItem(slot))) return;
+        ItemStack selected = player.getInventory().getItem(slot).clone();
+        player.closeInventory();
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            ItemStack current = player.getInventory().getItem(slot);
+            if (current == null || !current.isSimilar(selected) || current.getAmount() != selected.getAmount()) {
+                messages.send(player, "sell.item-changed");
+                return;
+            }
+            sellConversation.start(player, slot);
+        });
     }
 
     private void handleListingList(Player player, ListingListHolder holder, int slot) {

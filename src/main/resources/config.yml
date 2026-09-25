@@ -45,6 +45,7 @@ messages:
 
   gui:
     main-title: "オークションハウス"
+    sell-item-title: "出品するアイテムを選ぶ"
     list-title: "出品一覧"
     detail-title: "出品の詳細"
     my-listings-title: "自分の出品"
@@ -56,7 +57,7 @@ messages:
     browse: "&a出品を探す"
     browse-lore: "&7出品中のアイテムを見る"
     sell: "&a出品する"
-    sell-lore: "&7手に持っているアイテムを出品する"
+    sell-lore: "&7スマホを持っている場合は持ち物から選ぶ"
     my-listings: "&a自分の出品"
     my-listings-lore: "&7自分が出品したアイテムを見る"
     my-bids: "&a入札中"
