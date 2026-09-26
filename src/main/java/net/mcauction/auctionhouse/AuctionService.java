@@ -2,6 +2,8 @@ package net.mcauction.auctionhouse;
 
 import net.mcauction.auctionhouse.economy.EconomyService;
 import net.mcauction.auctionhouse.event.AuctionListedEvent;
+import net.mcauction.auctionhouse.event.AuctionSoldEvent;
+import net.mcauction.auctionhouse.event.AuctionExpiredEvent;
 import net.mcauction.auctionhouse.model.Listing;
 import net.mcauction.auctionhouse.model.ListingSort;
 import net.mcauction.auctionhouse.model.ListingStatus;
@@ -150,6 +152,9 @@ public class AuctionService {
                     }
                     settleSaleSideEffects(fresh, fresh.getTopBidderUuid(), fresh.getTopBidderName(),
                             fresh.getCurrentPrice(), saleFee);
+                    Bukkit.getPluginManager().callEvent(new AuctionSoldEvent(fresh.getSellerName(),
+                            fresh.getTopBidderName(), fresh.getDisplayName(), fresh.getAmount(),
+                            economyService.format(fresh.getCurrentPrice()), false));
                 } else {
                     boolean updated;
                     try {
@@ -164,6 +169,8 @@ public class AuctionService {
                     returnItemToSeller(fresh, "RETURNED");
                     Map<String, String> placeholders = Map.of("item", fresh.getDisplayName());
                     notifyPlayer(fresh.getSellerUuid(), messages.formatted("notify.unsold", placeholders));
+                    Bukkit.getPluginManager().callEvent(new AuctionExpiredEvent(fresh.getSellerName(),
+                            fresh.getDisplayName(), fresh.getAmount()));
                 }
             }
         }
@@ -424,6 +431,8 @@ public class AuctionService {
         }
 
         settleSaleSideEffects(listing, player.getUniqueId(), player.getName(), price, saleFee);
+        Bukkit.getPluginManager().callEvent(new AuctionSoldEvent(listing.getSellerName(), player.getName(),
+                listing.getDisplayName(), listing.getAmount(), economyService.format(price), true));
 
         Map<String, String> placeholders = new HashMap<>();
         placeholders.put("item", listing.getDisplayName());
