@@ -37,7 +37,7 @@ messages:
   prefix: "&6[オークション] &r"
   no-permission: "&cこの操作を行う権限がありません。"
   player-only: "&cこのコマンドはプレイヤーのみ実行できます。"
-  unknown-subcommand: "&c不明なサブコマンドです。/ah [sell|list|my|bids|vault|cancel]"
+  unknown-subcommand: "&cそのコマンドは使えません。使い方: /ah [sell|list|my|bids|vault|cancel]"
   economy-not-found: "&c経済プラグイン(Vault)が見つかりません。管理者に連絡してください。"
 
   error:
