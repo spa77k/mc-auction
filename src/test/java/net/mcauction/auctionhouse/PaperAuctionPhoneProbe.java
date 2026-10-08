@@ -5,7 +5,9 @@ import java.lang.reflect.Proxy;
 import java.util.UUID;
 import net.mcauction.auctionhouse.gui.GuiManager;
 import net.mcauction.auctionhouse.gui.SellItemHolder;
+import net.mcauction.auctionhouse.session.SellInputProcessor;
 import net.mcauction.auctionhouse.session.SellSession;
+import net.mcauction.auctionhouse.session.SessionManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -91,5 +93,42 @@ public final class PaperAuctionPhoneProbe extends JavaPlugin {
         items[5] = phone;
         check(service.confirmSell(player, session) == AuctionService.SellConfirmResult.ITEM_CHANGED,
                 "phone rejected at confirmation");
+
+        Object conversation = field(command, "sellConversation");
+        SellInputProcessor processor = (SellInputProcessor) field(conversation, "processor");
+        SessionManager sessions = (SessionManager) field(conversation, "sessionManager");
+        SellSession flow = new SellSession(new ItemStack(Material.DIAMOND, 3), 3, 5);
+        sessions.startSell(player.getUniqueId(), flow);
+        check(flow.getStep() == SellSession.Step.START_PRICE, "sell starts at start price");
+        processor.handle(player, "500");
+        check(flow.getStep() == SellSession.Step.CONFIRM, "start price leads to confirm");
+        check(flow.getAmount() == 3 && flow.getBuyoutPrice() == 0 && flow.getDurationHours() == 24,
+                "defaults are all items, no buyout, 24 hours");
+        String confirm = processor.promptText(flow);
+        check(confirm.contains("3個") && confirm.contains("500") && confirm.contains("なし") && confirm.contains("24時間"),
+                "confirm shows defaults: " + confirm);
+        processor.handle(player, "えっと");
+        check(flow.getStep() == SellSession.Step.CONFIRM, "unknown answer stays at confirm");
+        processor.handle(player, "変更");
+        check(flow.getStep() == SellSession.Step.AMOUNT, "change asks amount first");
+        processor.handle(player, "2");
+        check(flow.getStep() == SellSession.Step.BUYOUT_PRICE, "amount leads to buyout");
+        processor.handle(player, "500");
+        check(flow.getStep() == SellSession.Step.BUYOUT_PRICE, "buyout not above start price rejected");
+        processor.handle(player, "900");
+        check(flow.getStep() == SellSession.Step.DURATION, "buyout leads to duration");
+        processor.handle(player, "48");
+        check(flow.getStep() == SellSession.Step.CONFIRM, "duration returns to confirm");
+        check(flow.getAmount() == 2 && flow.getStartPrice() == 500 && flow.getBuyoutPrice() == 900
+                && flow.getDurationHours() == 48, "changed values kept");
+        processor.handle(player, "いいえ");
+        check(sessions.getSell(player.getUniqueId()) == null, "no ends the session");
+
+        SellSession single = new SellSession(new ItemStack(Material.DIAMOND), 1, 5);
+        sessions.startSell(player.getUniqueId(), single);
+        processor.handle(player, "100");
+        processor.handle(player, "変更");
+        check(single.getStep() == SellSession.Step.BUYOUT_PRICE, "single item skips amount");
+        sessions.end(player.getUniqueId());
     }
 }
