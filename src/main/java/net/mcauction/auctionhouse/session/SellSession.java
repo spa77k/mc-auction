@@ -5,14 +5,14 @@ import org.bukkit.inventory.ItemStack;
 public class SellSession {
 
     public enum Step {
-        AMOUNT,
         START_PRICE,
+        CONFIRM,
+        AMOUNT,
         BUYOUT_PRICE,
-        DURATION,
-        CONFIRM
+        DURATION
     }
 
-    private Step step = Step.AMOUNT;
+    private Step step = Step.START_PRICE;
     private final ItemStack snapshotItem;
     private final int maxAmount;
     private final int inventorySlot;
@@ -29,6 +29,7 @@ public class SellSession {
         this.snapshotItem = snapshotItem;
         this.maxAmount = maxAmount;
         this.inventorySlot = inventorySlot;
+        this.amount = maxAmount;
     }
 
     public Step getStep() {

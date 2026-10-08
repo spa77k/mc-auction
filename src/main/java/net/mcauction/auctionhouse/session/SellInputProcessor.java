@@ -52,7 +52,7 @@ public class SellInputProcessor {
                     return;
                 }
                 session.setAmount(amount);
-                session.setStep(SellSession.Step.START_PRICE);
+                session.setStep(SellSession.Step.BUYOUT_PRICE);
             }
             case START_PRICE -> {
                 int price;
@@ -69,7 +69,8 @@ public class SellInputProcessor {
                     return;
                 }
                 session.setStartPrice(price);
-                session.setStep(SellSession.Step.BUYOUT_PRICE);
+                session.setDurationHours(defaultDuration(durations));
+                session.setStep(SellSession.Step.CONFIRM);
             }
             case BUYOUT_PRICE -> {
                 int buyout;
@@ -129,6 +130,8 @@ public class SellInputProcessor {
                 } else if (isNo(trimmed)) {
                     messages.send(player, "sell.cancelled-confirm");
                     sessionManager.end(player.getUniqueId());
+                } else if (isChange(trimmed)) {
+                    session.setStep(session.getMaxAmount() > 1 ? SellSession.Step.AMOUNT : SellSession.Step.BUYOUT_PRICE);
                 } else {
                     messages.send(player, "sell.invalid-confirm");
                 }
@@ -152,9 +155,18 @@ public class SellInputProcessor {
             case BUYOUT_PRICE -> messages.get("prefix") + messages.get("sell.ask-buyout-price");
             case DURATION -> messages.get("prefix")
                     + messages.get("sell.ask-duration", Map.of("options", joinDurations(durations)));
-            case CONFIRM -> messages.get("prefix") + messages.get("sell.ask-confirm",
-                    Map.of("fee", String.valueOf(auctionService.calculateListingFee(session.getStartPrice()))));
+            case CONFIRM -> messages.get("prefix") + messages.get("sell.ask-confirm", Map.of(
+                    "amount", String.valueOf(session.getAmount()),
+                    "price", String.valueOf(session.getStartPrice()),
+                    "buyout", session.getBuyoutPrice() > 0 ? String.valueOf(session.getBuyoutPrice()) : "なし",
+                    "hours", String.valueOf(session.getDurationHours()),
+                    "fee", String.valueOf(auctionService.calculateListingFee(session.getStartPrice()))));
         };
+    }
+
+    private int defaultDuration(List<Integer> durations) {
+        int hours = config.getInt("auction.default-duration-hours", 24);
+        return durations.contains(hours) ? hours : durations.get(0);
     }
 
     private List<Integer> durations() {
@@ -171,6 +183,10 @@ public class SellInputProcessor {
 
     private boolean isNo(String s) {
         return s.equals("いいえ") || s.equalsIgnoreCase("n") || s.equalsIgnoreCase("no");
+    }
+
+    private boolean isChange(String s) {
+        return s.equals("変更") || s.equalsIgnoreCase("c") || s.equalsIgnoreCase("change");
     }
 
     private String joinDurations(List<Integer> durations) {

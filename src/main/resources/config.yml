@@ -8,6 +8,8 @@ auction:
   max-listings-per-player: 3
   # 出品期間として選べる時間(このリストの数値のみ受け付ける)
   durations-hours: [6, 12, 24, 48]
+  # 出品時に最初から選ばれている出品期間。durations-hours にない値なら、リストの先頭を使う。
+  default-duration-hours: 24
   # 出品料 = ceil(開始価格 * listing-fee-rate)、ただし listing-fee-min を下回らない。
   # 出品確定時に徴収し、売れ残り・取り消し・落札のいずれでも返還しない。
   listing-fee-rate: 0.05
@@ -86,8 +88,8 @@ messages:
     invalid-buyout-price: "&c即決価格は開始価格({min})より大きい整数で入力してください。不要な場合は0か「なし」を入力してください。"
     ask-duration: "&a出品期間を選んでください。({options}時間から数値で入力)"
     invalid-duration: "&c出品期間は{options}時間のいずれかで入力してください。"
-    ask-confirm: "&a出品料{fee}を徴収して出品します。よろしいですか？(はい/いいえ)"
-    invalid-confirm: "&c「はい」または「いいえ」で答えてください。"
+    ask-confirm: "&a次の内容で出品します。\n&7個数: &f{amount}個 &7/ 開始価格: &f{price} &7/ 即決価格: &f{buyout} &7/ 期間: &f{hours}時間\n&a出品料{fee}を徴収します。よろしいですか？(はい/いいえ。個数・即決価格・期間を変えるなら「変更」)"
+    invalid-confirm: "&c「はい」「いいえ」「変更」のいずれかで答えてください。"
     cancelled-confirm: "&e出品をキャンセルしました。"
     insufficient-funds: "&c出品料{fee}分の所持金が足りないため出品できませんでした。"
     item-changed: "&c手持ちのアイテムが出品開始時から変わっているため出品できませんでした。"
