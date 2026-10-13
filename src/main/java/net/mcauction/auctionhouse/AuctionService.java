@@ -11,6 +11,7 @@ import net.mcauction.auctionhouse.model.Notification;
 import net.mcauction.auctionhouse.model.VaultItem;
 import net.mcauction.auctionhouse.session.SellSession;
 import net.mcauction.auctionhouse.storage.BidRepository;
+import net.mcauction.auctionhouse.storage.Database;
 import net.mcauction.auctionhouse.storage.ListingRepository;
 import net.mcauction.auctionhouse.storage.NotificationRepository;
 import net.mcauction.auctionhouse.storage.VaultRepository;
@@ -27,6 +28,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 
 import java.sql.SQLException;
+import java.sql.Connection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -68,6 +70,7 @@ public class AuctionService {
     }
 
     private final ListingRepository listingRepository;
+    private final Database database;
     private final BidRepository bidRepository;
     private final VaultRepository vaultRepository;
     private final NotificationRepository notificationRepository;
@@ -77,10 +80,11 @@ public class AuctionService {
     private final Logger logger;
     private final Map<Integer, Object> listingLocks = new ConcurrentHashMap<>();
 
-    public AuctionService(ListingRepository listingRepository, BidRepository bidRepository,
+    public AuctionService(Database database, ListingRepository listingRepository, BidRepository bidRepository,
                            VaultRepository vaultRepository, NotificationRepository notificationRepository,
                            EconomyService economyService, MessageUtil messages, FileConfiguration config,
                            Logger logger) {
+        this.database = database;
         this.listingRepository = listingRepository;
         this.bidRepository = bidRepository;
         this.vaultRepository = vaultRepository;
@@ -294,6 +298,102 @@ public class AuctionService {
         return SellConfirmResult.OK;
     }
 
+    /** 手持ちの一山を Discord 出品待ちとして保管する。/ah vault から取り戻せる。 */
+    public String depositForDiscord(Player player) {
+        ItemStack item = player.getInventory().getItemInMainHand();
+        if (!isSellableItem(item)) return "出品できるアイテムを手に持ってください。";
+        if (findStaged(player.getUniqueId()).size() >= 5) {
+            return "出品用の預かり品は5件までです。先に出品するか、/ah vault から受け取ってください。";
+        }
+        try {
+            VaultItem stored = vaultRepository.insert(player.getUniqueId(), player.getName(),
+                    ItemSerialization.serialize(item), item.getAmount(), "STAGED", System.currentTimeMillis());
+            player.getInventory().setItemInMainHand(new ItemStack(Material.AIR));
+            return "出品用に預かりました。預かり番号: " + stored.getId();
+        } catch (SQLException e) {
+            logger.log(Level.WARNING, "Discord出品用アイテムの預かりに失敗しました", e);
+            return "預かりに失敗しました。アイテムは手元に残っています。";
+        }
+    }
+
+    public List<VaultItem> findStaged(UUID owner) {
+        try {
+            return vaultRepository.findByOwner(owner).stream()
+                    .filter(item -> "STAGED".equals(item.getReason())).toList();
+        } catch (SQLException e) {
+            logger.log(Level.WARNING, "Discord出品用アイテムの取得に失敗しました", e);
+            return List.of();
+        }
+    }
+
+    public String stagedDisplayName(VaultItem staged) {
+        return ItemSerialization.deserialize(staged.getItemData(), logger,
+                "vault_items#" + staged.getId()).map(this::resolveDisplayName).orElse("読み取れない品物");
+    }
+
+    /** 認証済み本人の預かり品から出品。DB更新を同一トランザクションにする。 */
+    public synchronized String sellStaged(UUID sellerId, String sellerName, int stagedId,
+                                          int startPrice, int buyoutPrice, int durationHours) {
+        if (startPrice < config.getInt("auction.min-price", 10)
+                || startPrice > config.getInt("auction.max-price", 100000)
+                || (buyoutPrice != 0 && buyoutPrice <= startPrice)
+                || !config.getIntegerList("auction.durations-hours").contains(durationHours)) {
+            return "価格か期間が設定範囲外です。";
+        }
+        VaultItem staged = findStaged(sellerId).stream()
+                .filter(item -> item.getId() == stagedId).findFirst().orElse(null);
+        if (staged == null) return "預かり品が見つかりません。";
+        ItemStack item = ItemSerialization.deserialize(staged.getItemData(), logger,
+                "vault_items#" + stagedId).orElse(null);
+        if (!isSellableItem(item)) return "この預かり品は出品できません。";
+        try {
+            if (listingRepository.countActiveBySeller(sellerId)
+                    >= config.getInt("auction.max-listings-per-player", 3)) {
+                return "同時出品数の上限に達しています。";
+            }
+        } catch (SQLException e) {
+            logger.log(Level.WARNING, "出品数の取得に失敗しました", e);
+            return "出品数を確認できませんでした。";
+        }
+        int fee = calculateListingFee(startPrice);
+        OfflinePlayer seller = Bukkit.getOfflinePlayer(sellerId);
+        if (!economyService.isReady() || !economyService.has(seller, fee)
+                || !economyService.withdraw(seller, fee)) return "出品料の残高が足りません。";
+        Connection connection = database.getConnection();
+        Listing listing;
+        try {
+            connection.setAutoCommit(false);
+            long now = System.currentTimeMillis();
+            listing = listingRepository.insert(sellerId, sellerName, staged.getItemData(),
+                    resolveDisplayName(item), staged.getAmount(), startPrice, buyoutPrice,
+                    now, now + durationHours * 3_600_000L, fee);
+            vaultRepository.deleteById(stagedId);
+            connection.commit();
+        } catch (SQLException e) {
+            try { connection.rollback(); } catch (SQLException rollbackError) {
+                logger.log(Level.SEVERE, "出品の巻き戻しに失敗しました", rollbackError);
+            }
+            boolean refunded = economyService.deposit(seller, fee);
+            logger.log(Level.WARNING, "預かり品の出品に失敗しました", e);
+            if (!refunded) {
+                logger.severe("出品料の返金に失敗しました。対象: " + sellerId + "、金額: " + fee);
+                return "出品に失敗しました。出品料を返金できなかったため、運営に連絡してください。";
+            }
+            return "出品に失敗しました。出品料は返金しました。";
+        } finally {
+            try { connection.setAutoCommit(true); } catch (SQLException e) {
+                logger.log(Level.SEVERE, "出品DBの状態を戻せませんでした", e);
+            }
+        }
+        Bukkit.broadcastMessage(messages.formatted("announce.listed", Map.of(
+                "player", sellerName, "item", resolveDisplayName(item),
+                "price", economyService.format(startPrice))));
+        Bukkit.getPluginManager().callEvent(new AuctionListedEvent(listing.getId(), sellerId,
+                sellerName, resolveDisplayName(item), staged.getAmount(), startPrice, buyoutPrice,
+                durationHours, economyService.format(startPrice), economyService.format(buyoutPrice)));
+        return "出品しました。出品番号: " + listing.getId() + "（出品料 " + fee + "）";
+    }
+
     public boolean isSellableItem(ItemStack item) {
         return item != null && !item.getType().isAir() && !isEcoLifePhone(item)
                 && !config.getStringList("auction.banned-materials").contains(item.getType().name());
@@ -309,16 +409,22 @@ public class AuctionService {
     // ---------------------------------------------------------------
 
     public BidResult placeBid(Player player, int listingId, int amount) {
+        return placeBid(player, player.getName(), listingId, amount);
+    }
+
+    public BidResult placeBid(OfflinePlayer player, String playerName, int listingId, int amount) {
         synchronized (lockFor(listingId)) {
             Listing listing = findOrNull(listingId);
-            if (listing == null || listing.getStatus() != ListingStatus.ACTIVE) {
+            if (listing == null || listing.getStatus() != ListingStatus.ACTIVE
+                    || listing.getEndAt() <= System.currentTimeMillis()) {
                 return BidResult.NOT_ACTIVE;
             }
             if (listing.getSellerUuid().equals(player.getUniqueId())) {
                 return BidResult.OWN_LISTING;
             }
+            if (!economyService.isReady()) return BidResult.FAILED;
             if (listing.hasBuyout() && amount >= listing.getBuyoutPrice()) {
-                BuyoutResult result = executeBuyout(player, listing);
+                BuyoutResult result = executeBuyout(player, playerName, listing);
                 return switch (result) {
                     case SUCCESS -> BidResult.BOUGHT_OUT;
                     case INSUFFICIENT_FUNDS -> BidResult.INSUFFICIENT_FUNDS;
@@ -357,8 +463,8 @@ public class AuctionService {
 
             try {
                 listingRepository.updateAfterBid(listingId, amount, listing.getBidCount() + 1,
-                        player.getUniqueId(), player.getName(), endAt, extensionCount);
-                bidRepository.insert(listingId, player.getUniqueId(), player.getName(), amount, now);
+                        player.getUniqueId(), playerName, endAt, extensionCount);
+                bidRepository.insert(listingId, player.getUniqueId(), playerName, amount, now);
             } catch (SQLException e) {
                 logger.log(Level.WARNING, "入札の保存に失敗しました。出品ID: " + listingId, e);
                 economyService.deposit(player, amount);
@@ -372,7 +478,7 @@ public class AuctionService {
             Map<String, String> placeholders = new HashMap<>();
             placeholders.put("item", listing.getDisplayName());
             placeholders.put("price", economyService.format(amount));
-            messages.send(player, "bid.success", placeholders);
+            if (player instanceof Player online) messages.send(online, "bid.success", placeholders);
 
             if (extended) {
                 announceExtension(listing);
@@ -394,11 +500,12 @@ public class AuctionService {
             if (listing.getSellerUuid().equals(player.getUniqueId())) {
                 return BuyoutResult.OWN_LISTING;
             }
-            return executeBuyout(player, listing);
+            if (!economyService.isReady()) return BuyoutResult.FAILED;
+            return executeBuyout(player, player.getName(), listing);
         }
     }
 
-    private BuyoutResult executeBuyout(Player player, Listing listing) {
+    private BuyoutResult executeBuyout(OfflinePlayer player, String playerName, Listing listing) {
         int price = listing.getBuyoutPrice();
         if (!economyService.has(player, price)) {
             return BuyoutResult.INSUFFICIENT_FUNDS;
@@ -417,8 +524,8 @@ public class AuctionService {
 
         try {
             listingRepository.updateAfterBid(listing.getId(), price, listing.getBidCount() + 1,
-                    player.getUniqueId(), player.getName(), listing.getEndAt(), listing.getExtensionCount());
-            bidRepository.insert(listing.getId(), player.getUniqueId(), player.getName(), price, now);
+                    player.getUniqueId(), playerName, listing.getEndAt(), listing.getExtensionCount());
+            bidRepository.insert(listing.getId(), player.getUniqueId(), playerName, price, now);
             listingRepository.markSold(listing.getId(), now, saleFee);
         } catch (SQLException e) {
             logger.log(Level.WARNING, "即決購入の保存に失敗しました。出品ID: " + listing.getId(), e);
@@ -430,14 +537,14 @@ public class AuctionService {
             refundAndNotifyOutbid(previousBidder, previousBidderName, previousAmount, listing, price);
         }
 
-        settleSaleSideEffects(listing, player.getUniqueId(), player.getName(), price, saleFee);
-        Bukkit.getPluginManager().callEvent(new AuctionSoldEvent(listing.getSellerName(), player.getName(),
+        settleSaleSideEffects(listing, player.getUniqueId(), playerName, price, saleFee);
+        Bukkit.getPluginManager().callEvent(new AuctionSoldEvent(listing.getSellerName(), playerName,
                 listing.getDisplayName(), listing.getAmount(), economyService.format(price), true));
 
         Map<String, String> placeholders = new HashMap<>();
         placeholders.put("item", listing.getDisplayName());
         placeholders.put("price", economyService.format(price));
-        messages.send(player, "buyout.success", placeholders);
+        if (player instanceof Player online) messages.send(online, "buyout.success", placeholders);
 
         return BuyoutResult.SUCCESS;
     }

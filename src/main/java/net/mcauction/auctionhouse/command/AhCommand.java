@@ -18,7 +18,7 @@ import java.util.Locale;
 
 public class AhCommand implements CommandExecutor, TabCompleter {
 
-    private static final List<String> SUBCOMMANDS = List.of("sell", "list", "my", "bids", "vault", "cancel", "admin");
+    private static final List<String> SUBCOMMANDS = List.of("sell", "deposit", "list", "my", "bids", "vault", "cancel", "admin");
     private static final List<String> ADMIN_SUBCOMMANDS = List.of("cancel");
 
     private final GuiManager guiManager;
@@ -54,6 +54,7 @@ public class AhCommand implements CommandExecutor, TabCompleter {
                     guiManager.openSellItemPicker(player);
                 else sellConversation.start(player);
             }
+            case "deposit" -> player.sendMessage(auctionService.depositForDiscord(player));
             case "list", "browse" -> guiManager.openListingList(player, 0, ListingSort.ENDING_SOON);
             case "my" -> guiManager.openMyListings(player);
             case "bids" -> guiManager.openMyBids(player);

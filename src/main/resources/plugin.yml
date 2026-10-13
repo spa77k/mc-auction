@@ -8,7 +8,7 @@ depend: [Vault]
 commands:
   ah:
     description: オークションハウスを開く
-    usage: /ah [sell|list|my|bids|vault|cancel|admin]
+    usage: /ah [sell|deposit|list|my|bids|vault|cancel|admin]
     aliases: [auction]
 
 permissions:
